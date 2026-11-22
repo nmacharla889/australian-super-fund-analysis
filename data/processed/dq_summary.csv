@@ -1,0 +1,11 @@
+,rows_failed,pct_of_rows
+any_masked_field,249,12.8
+missing_assets,248,12.8
+avg_balance_mismatch,33,1.7
+expense_ratio_high,23,1.2
+return_out_of_range,13,0.7
+dup_abn_period,8,0.4
+non_12_month_duration,5,0.3
+negative_assets,0,0.0
+members_but_no_assets,0,0.0
+missing_fund_type,0,0.0
