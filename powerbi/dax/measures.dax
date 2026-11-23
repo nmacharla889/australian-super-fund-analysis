@@ -1,0 +1,107 @@
+// All measures live in a table called _Measures (Home > Enter data > load an empty table).
+// Format shown after each measure: set it in Measure tools > Format.
+
+// ---------- Base ----------
+Total Assets =
+SUM ( FactFundYear[Total Assets] )
+// Format: Currency, $ billion via display units on visuals
+
+Member Accounts =
+SUM ( FactFundYear[Member Accounts] )
+// Format: Whole number
+
+Number of Funds =
+DISTINCTCOUNT ( FactFundYear[ABN] )
+// Format: Whole number
+
+Assets per Member =
+DIVIDE ( [Total Assets], [Member Accounts] )
+// DIVIDE returns BLANK instead of an error when Member Accounts is 0 or blank.
+
+// ---------- Time ----------
+Assets Prior Year =
+VAR y = MAX ( DimYear[Year] )
+RETURN
+    CALCULATE ( [Total Assets], DimYear[Year] = y - 1 )
+// CALCULATE swaps the current year filter for "last year".
+// We don't use SAMEPERIODLASTYEAR because there's no proper date table, only a Year number.
+
+Assets YoY % =
+DIVIDE ( [Total Assets] - [Assets Prior Year], [Assets Prior Year] )
+// Format: Percentage, 1 decimal
+
+// ---------- Share and rank ----------
+Share of Total Assets =
+DIVIDE ( [Total Assets], CALCULATE ( [Total Assets], ALL ( DimFund ) ) )
+// ALL(DimFund) removes the fund filter only, so the year and fund type slicers still apply.
+// Format: Percentage, 1 decimal
+
+Fund Rank by Assets =
+IF (
+    HASONEVALUE ( DimFund[Fund Name] ) && NOT ISBLANK ( [Total Assets] ),
+    RANKX ( ALL ( DimFund[Fund Name] ), [Total Assets], , DESC, DENSE )
+)
+// The IF stops a meaningless rank showing on total rows and for funds with no assets that year.
+
+// ---------- Returns and costs ----------
+Avg Return 1Y (asset weighted) =
+VAR rowsWithReturn =
+    FILTER ( FactFundYear, NOT ISBLANK ( FactFundYear[Return 1Y] ) )
+RETURN
+    DIVIDE (
+        SUMX ( rowsWithReturn, FactFundYear[Return 1Y] * FactFundYear[Total Assets] ),
+        SUMX ( rowsWithReturn, FactFundYear[Total Assets] )
+    )
+// Weighted by assets, so a $400bn fund counts more than a $10m one.
+// The denominator only uses funds that HAVE a return; otherwise masked funds would drag the average down.
+// Format: Percentage, 1 decimal
+
+Avg Total Expense Ratio (asset weighted) =
+VAR rowsWithTER =
+    FILTER ( FactFundYear, NOT ISBLANK ( FactFundYear[Total Expense Ratio] ) )
+RETURN
+    DIVIDE (
+        SUMX ( rowsWithTER, FactFundYear[Total Expense Ratio] * FactFundYear[Total Assets] ),
+        SUMX ( rowsWithTER, FactFundYear[Total Assets] )
+    )
+// Format: Percentage, 2 decimals
+
+// ---------- Data quality ----------
+Flagged Rows =
+CALCULATE ( COUNTROWS ( FactFundYear ), FactFundYear[DQ Flag] = TRUE () )
+
+Flagged Rows % =
+DIVIDE ( [Flagged Rows], COUNTROWS ( FactFundYear ) )
+// Format: Percentage, 1 decimal
+
+Check Failures =
+COUNTROWS ( FactDQCheck )
+
+// ---------- Fund detail page (latest year) ----------
+// The drill-through page shows one fund across all years. Assets and accounts are balances,
+// so summing them across years is meaningless. These show the fund's last reported year instead.
+
+Total Assets (latest year) =
+VAR y = MAX ( DimFund[Latest Year] )
+RETURN CALCULATE ( [Total Assets], DimYear[Year] = y )
+// Format: Currency
+
+Member Accounts (latest year) =
+VAR y = MAX ( DimFund[Latest Year] )
+RETURN CALCULATE ( [Member Accounts], DimYear[Year] = y )
+// Format: Whole number
+
+Avg Return 1Y (latest year) =
+VAR y = MAX ( DimFund[Latest Year] )
+RETURN CALCULATE ( [Avg Return 1Y (asset weighted)], DimYear[Year] = y )
+// Format: Percentage, 1 decimal
+
+// ---------- Dynamic titles ----------
+
+Overview Subtitle =
+"Australian super funds, June " & SELECTEDVALUE ( DimYear[Year] )
+// Used as the Overview page title (text box > + Value), so a screenshot always shows which year it is.
+
+Fund Detail Title =
+SELECTEDVALUE ( DimFund[Fund Name] ) & "  |  as at June " & MAX ( DimFund[Latest Year] )
+// SELECTEDVALUE returns the fund name when exactly one fund is selected (drill-through guarantees this).
