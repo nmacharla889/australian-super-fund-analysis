@@ -1,0 +1,3 @@
+// Modeling > New table
+DimYear =
+DISTINCT ( SELECTCOLUMNS ( FactFundYear, "Year", FactFundYear[Year] ) )
